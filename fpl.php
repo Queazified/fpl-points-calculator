@@ -551,17 +551,63 @@ function outputHTML($data, $cacheAge) {
                 padding: 10px;
             }
             
+            .header {
+                padding: 20px 15px;
+                margin-bottom: 15px;
+            }
+            
             .header h1 {
-                font-size: 1.8em;
+                font-size: 1.5em;
+                margin-bottom: 8px;
+            }
+            
+            .live-indicator {
+                padding: 6px 16px;
+                font-size: 0.85em;
+                margin: 10px 0;
             }
             
             .gameweek-info {
                 font-size: 1em;
+                margin-top: 8px;
+            }
+            
+            .last-updated {
+                font-size: 0.8em;
+                margin-top: 8px;
+            }
+            
+            .leaderboard {
+                border-radius: 10px;
             }
             
             th, td {
-                padding: 12px 8px;
+                padding: 12px 6px;
+            }
+            
+            th {
+                font-size: 0.75em;
+                letter-spacing: 0.3px;
+            }
+            
+            td {
                 font-size: 0.9em;
+            }
+            
+            .rank {
+                width: 45px;
+                font-size: 1em;
+            }
+            
+            .rank-medal {
+                width: 26px;
+                height: 26px;
+                line-height: 26px;
+                font-size: 0.85em;
+            }
+            
+            .team-name {
+                font-size: 1em;
             }
             
             .manager-name,
@@ -569,11 +615,26 @@ function outputHTML($data, $cacheAge) {
                 display: none;
             }
             
+            .total-points {
+                font-size: 1.1em;
+            }
+            
+            .gw-points {
+                font-size: 1em;
+            }
+            
             .refresh-button {
                 bottom: 15px;
                 right: 15px;
                 padding: 12px 20px;
                 font-size: 0.9em;
+            }
+        }
+        
+        /* Remove hover effect on touch devices */
+        @media (hover: hover) and (max-width: 768px) {
+            tbody tr:hover {
+                transform: translateX(2px);
             }
         }
     </style>
@@ -922,16 +983,47 @@ function displayHomepage($error = null) {
         }
         
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
             .card {
-                padding: 25px;
+                padding: 20px;
             }
             
             h1 {
-                font-size: 2em;
+                font-size: 1.8em;
+            }
+            
+            .subtitle {
+                font-size: 1em;
+                margin-bottom: 20px;
+            }
+            
+            .instructions {
+                padding: 20px;
+            }
+            
+            .instructions h2 {
+                font-size: 1.3em;
+            }
+            
+            .instructions ol {
+                font-size: 0.95em;
+            }
+            
+            .example {
+                font-size: 0.85em;
+                padding: 12px;
             }
             
             .features {
                 grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .feature {
+                padding: 15px;
             }
         }
     </style>
