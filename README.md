@@ -64,10 +64,10 @@ A PHP-based web application that displays live Fantasy Premier League (FPL) leag
 1. Go to [Fantasy Premier League](https://fantasy.premierleague.com/) and log in
 2. Navigate to **Leagues & Cups** from the menu
 3. Select the league you want to view
-4. Look at the URL in your browser:
+4. Look at the URL in your browser, it should be something like this:
    ```
    https://fantasy.premierleague.com/leagues/309812/standings/c
-                                              ^^^^^^
+                                             ^^^^^^
                                            This is your League ID
    ```
 
@@ -143,7 +143,7 @@ Forces a fresh API call, bypassing the cache.
 
 ## 🔧 Configuration
 
-Edit these constants in `fpl.php` to customize behavior:
+Edit these constants in `fpl.php` to customise behaviour:
 
 ```php
 define('CACHE_DIR', __DIR__ . '/cache');    // Cache directory location
@@ -180,7 +180,7 @@ This application fetches data from the official Fantasy Premier League API:
 
 ## 🎨 Design Specifications
 
-### Color Scheme
+### Colour Scheme
 - **Background Gradient**: `#667eea` → `#764ba2` (Purple)
 - **FPL Brand**: `#37003c` (Dark Purple)
 - **Accent/Live**: `#00ff87` (Bright Green)
@@ -201,7 +201,7 @@ This application fetches data from the official Fantasy Premier League API:
 
 **Possible causes:**
 - Invalid league ID
-- FPL API is down or rate-limiting
+- FPL API is down or rate-limited
 - Network connectivity issues
 - cURL not enabled
 
@@ -289,3 +289,5 @@ Potential features for future releases:
 ---
 
 **Made with ⚽ for FPL managers everywhere**
+Copyright © 2025 Queazified. All rights reserved.
+This project is not affiliated with, endorsed by, or sponsored by the Fantasy Premier League, the Premier League, or any associated organisations. All trademarks and copyrights belong to their respective owners.
