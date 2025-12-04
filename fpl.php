@@ -870,7 +870,7 @@ function displayHomepage($error = null) {
             margin-bottom: 10px;
         }
         
-        .screenshot-placeholder {
+        .screenshot {
             background: #e9ecef;
             border: 2px dashed #adb5bd;
             border-radius: 8px;
@@ -990,14 +990,12 @@ function displayHomepage($error = null) {
                 <br>→ League ID is <strong>309812</strong>
             </div>
             
-            <!-- Screenshot Placeholder 1: FPL Website Navigation -->
-            <div class="screenshot-placeholder">
-                📸 Screenshot Placeholder: FPL website showing Leagues & Cups menu navigation
+            <div class="screenshot">
+                <img src="screenshots/step1.png" alt="FPL Leagues & Cups navigation" style="max-width: 100%; height: auto; border-radius: 8px;">
             </div>
             
-            <!-- Screenshot Placeholder 2: League Page with URL -->
-            <div class="screenshot-placeholder">
-                📸 Screenshot Placeholder: League standings page with URL bar highlighted showing the league ID
+            <div class="screenshot">
+                <img src="screenshots/step2.png" alt="League standings page with URL bar highlighted showing the league ID" style="max-width: 100%; height: auto; border-radius: 8px;">
             </div>
         </div>
         
