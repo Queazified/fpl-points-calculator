@@ -581,14 +581,16 @@ function outputHTML($data, $cacheAge) {
                 border-radius: 10px;
             }
             
-            th {
+            th, td {
                 padding: 12px 6px;
+            }
+            
+            th {
                 font-size: 0.75em;
                 letter-spacing: 0.3px;
             }
             
             td {
-                padding: 12px 6px;
                 font-size: 0.9em;
             }
             
@@ -627,7 +629,10 @@ function outputHTML($data, $cacheAge) {
                 padding: 12px 20px;
                 font-size: 0.9em;
             }
-            
+        }
+        
+        /* Remove hover effect on touch devices */
+        @media (hover: hover) and (max-width: 768px) {
             tbody tr:hover {
                 transform: translateX(2px);
             }
