@@ -1,0 +1,18 @@
+# FPL Points Calculator
+
+> Live Fantasy Premier League mini-league leaderboard with HTML, JSON, and CSV outputs.
+
+## Primary URL
+- https://queazified.github.io/fpl-points-calculator/fpl.php
+
+## Purpose
+FPL Points Calculator provides near real-time mini-league standings using official Fantasy Premier League API data and lightweight server-side caching.
+
+## Key Pages
+- /fpl.php — homepage and interactive leaderboard
+- /404.php — custom not found page
+
+## Data Sources
+- https://fantasy.premierleague.com/api/bootstrap-static/
+- https://fantasy.premierleague.com/api/leagues-classic/{league_id}/standings/
+- https://fantasy.premierleague.com/api/entry/{entry_id}/
