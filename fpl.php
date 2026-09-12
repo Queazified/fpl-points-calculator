@@ -23,6 +23,25 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); // Hide errors in production
 
 /**
+ * Build the base URL for canonical and sitemap references.
+ */
+function getBaseUrl() {
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+    $scheme = $isHttps ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    return $scheme . '://' . $host . ($scriptDir === '' ? '' : $scriptDir);
+}
+
+/**
+ * Escape string for safe HTML attribute output.
+ */
+function escapeAttr($value) {
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+/**
  * Check if refresh is allowed (server-side rate limiting)
  */
 function isRefreshAllowed($leagueId) {
@@ -313,6 +332,9 @@ function outputHTML($data, $cacheAge) {
     $lastUpdated = $data['last_updated'];
     $leagueId = $data['league']['id'];
     $errorMessage = isset($data['error']) ? $data['error'] : null;
+    $pageTitle = $leagueName . ' Leaderboard | FPL Points Calculator';
+    $metaDescription = 'Live Fantasy Premier League standings for ' . $leagueName . '. Track total points, gameweek points, and overall ranks in real time.';
+    $canonicalUrl = getBaseUrl() . '/fpl.php?league=' . urlencode((string)$leagueId);
     
     ?>
 <!DOCTYPE html>
@@ -320,8 +342,10 @@ function outputHTML($data, $cacheAge) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $leagueName; ?> - FPL Leaderboard</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>⚽</text></svg>">
+    <title><?php echo escapeAttr($pageTitle); ?></title>
+    <meta name="description" content="<?php echo escapeAttr($metaDescription); ?>">
+    <link rel="canonical" href="<?php echo escapeAttr($canonicalUrl); ?>">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <style>
         * {
             margin: 0;
@@ -698,42 +722,33 @@ function outputHTML($data, $cacheAge) {
     </div>
     
     <script>
-        // Live timestamp updater
-        const lastUpdatedTime = new Date('<?php echo $data['last_updated']; ?>').getTime();
-        
-        function updateTimestamp() {
-            const now = Date.now();
-            const diffSeconds = Math.floor((now - lastUpdatedTime) / 1000);
-            
-            let timeString;
-            if (diffSeconds < 60) {
-                timeString = diffSeconds + ' second' + (diffSeconds !== 1 ? 's' : '') + ' ago';
-            } else if (diffSeconds < 3600) {
-                const minutes = Math.floor(diffSeconds / 60);
-                timeString = minutes + ' minute' + (minutes !== 1 ? 's' : '') + ' ago';
-            } else {
-                const hours = Math.floor(diffSeconds / 3600);
-                timeString = hours + ' hour' + (hours !== 1 ? 's' : '') + ' ago';
-            }
-            
-            document.querySelector('.last-updated').innerHTML = 
-                'Last updated: <?php echo $data['last_updated']; ?> (' + timeString + ')';
-        }
-        
-        // Update timestamp every second
-        setInterval(updateTimestamp, 1000);
-        updateTimestamp();
-        
         // Refresh button rate limiting (30 seconds cooldown)
         const COOLDOWN_SECONDS = 30;
         const COOLDOWN_KEY = 'fpl_last_refresh_<?php echo $leagueId; ?>';
+
+        function getStoredRefresh() {
+            try {
+                const value = Number(localStorage.getItem(COOLDOWN_KEY));
+                return Number.isFinite(value) && value > 0 ? value : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function setStoredRefresh(value) {
+            try {
+                localStorage.setItem(COOLDOWN_KEY, value.toString());
+            } catch (error) {
+                // Ignore storage errors to prevent console noise in restricted environments.
+            }
+        }
         
         function handleRefresh() {
-            const lastRefresh = localStorage.getItem(COOLDOWN_KEY);
+            const lastRefresh = getStoredRefresh();
             const now = Date.now();
             
             if (lastRefresh) {
-                const timeSinceRefresh = (now - parseInt(lastRefresh)) / 1000;
+                const timeSinceRefresh = (now - lastRefresh) / 1000;
                 if (timeSinceRefresh < COOLDOWN_SECONDS) {
                     const remaining = Math.ceil(COOLDOWN_SECONDS - timeSinceRefresh);
                     alert('Please wait ' + remaining + ' second' + (remaining !== 1 ? 's' : '') + ' before refreshing again.');
@@ -741,25 +756,25 @@ function outputHTML($data, $cacheAge) {
                 }
             }
             
-            localStorage.setItem(COOLDOWN_KEY, now.toString());
+            setStoredRefresh(now);
             window.location.href = '?league=<?php echo $leagueId; ?>&refresh=1';
         }
         
         // Check cooldown on page load and update button state
         function checkCooldown() {
-            const lastRefresh = localStorage.getItem(COOLDOWN_KEY);
+            const lastRefresh = getStoredRefresh();
             const now = Date.now();
             const btn = document.getElementById('refreshBtn');
             
             if (lastRefresh) {
-                const timeSinceRefresh = (now - parseInt(lastRefresh)) / 1000;
+                const timeSinceRefresh = (now - lastRefresh) / 1000;
                 if (timeSinceRefresh < COOLDOWN_SECONDS) {
                     const remaining = Math.ceil(COOLDOWN_SECONDS - timeSinceRefresh);
                     btn.disabled = true;
                     btn.textContent = '⏳ Wait ' + remaining + 's';
                     
                     const interval = setInterval(() => {
-                        const newTimeSinceRefresh = (Date.now() - parseInt(lastRefresh)) / 1000;
+                        const newTimeSinceRefresh = (Date.now() - lastRefresh) / 1000;
                         const newRemaining = Math.ceil(COOLDOWN_SECONDS - newTimeSinceRefresh);
                         
                         if (newRemaining <= 0) {
@@ -786,14 +801,19 @@ function outputHTML($data, $cacheAge) {
  * Display homepage with instructions
  */
 function displayHomepage($error = null) {
+    $pageTitle = 'FPL Points Calculator | Live Fantasy Premier League Leaderboard';
+    $metaDescription = 'Enter your Fantasy Premier League mini-league ID to view live standings, total points, gameweek points, and rankings.';
+    $canonicalUrl = getBaseUrl() . '/fpl.php';
     ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FPL Real-Time Leaderboard</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>⚽</text></svg>">
+    <title><?php echo escapeAttr($pageTitle); ?></title>
+    <meta name="description" content="<?php echo escapeAttr($metaDescription); ?>">
+    <link rel="canonical" href="<?php echo escapeAttr($canonicalUrl); ?>">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <style>
         * {
             margin: 0;
@@ -1047,7 +1067,6 @@ function displayHomepage($error = null) {
                         type="text" 
                         id="league" 
                         name="league" 
-                        placeholder="e.g., 309812" 
                         required
                         pattern="[0-9]+"
                         title="Please enter a valid numeric league ID"
@@ -1083,11 +1102,11 @@ function displayHomepage($error = null) {
             </div>
             
             <div class="screenshot">
-                <img src="screenshots/step1.png" alt="FPL Leagues & Cups navigation" style="max-width: 100%; height: auto; border-radius: 8px;">
+                <img src="steps/step1.png" alt="FPL Leagues and Cups navigation" style="max-width: 100%; height: auto; border-radius: 8px;">
             </div>
             
             <div class="screenshot">
-                <img src="screenshots/step2.png" alt="League standings page with URL bar highlighted showing the league ID" style="max-width: 100%; height: auto; border-radius: 8px;">
+                <img src="steps/step2.png" alt="League standings page showing where to find the league ID in the URL" style="max-width: 100%; height: auto; border-radius: 8px;">
             </div>
         </div>
         

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://queazified.github.io/fpl-points-calculator/sitemap.xml
