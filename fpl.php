@@ -23,7 +23,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); // Hide errors in production
 
 /**
- * Build the base URL for canonical and sitemap references.
+ * Build the current script directory's HTTP or HTTPS base URL from request metadata.
  */
 function getBaseUrl() {
     $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -35,7 +35,7 @@ function getBaseUrl() {
 }
 
 /**
- * Escape string for safe HTML attribute output.
+ * Escape a value for use in a UTF-8 HTML attribute.
  */
 function escapeAttr($value) {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -324,7 +324,9 @@ function outputCSV($data) {
 }
 
 /**
- * Output data as HTML
+ * Render the league leaderboard as HTML and end the request.
+ *
+ * The cache age is displayed alongside the data's last-updated timestamp.
  */
 function outputHTML($data, $cacheAge) {
     $leagueName = htmlspecialchars($data['league']['name']);
@@ -726,6 +728,9 @@ function outputHTML($data, $cacheAge) {
         const COOLDOWN_SECONDS = 30;
         const COOLDOWN_KEY = 'fpl_last_refresh_<?php echo $leagueId; ?>';
 
+        /**
+         * Return the stored refresh timestamp, or null when it is absent, invalid, or inaccessible.
+         */
         function getStoredRefresh() {
             try {
                 const value = Number(localStorage.getItem(COOLDOWN_KEY));
@@ -735,6 +740,9 @@ function outputHTML($data, $cacheAge) {
             }
         }
 
+        /**
+         * Attempt to store a millisecond refresh timestamp, silently ignoring storage errors.
+         */
         function setStoredRefresh(value) {
             try {
                 localStorage.setItem(COOLDOWN_KEY, value.toString());
@@ -743,6 +751,9 @@ function outputHTML($data, $cacheAge) {
             }
         }
         
+        /**
+         * Redirect to a forced refresh when the cooldown has elapsed, or show the remaining wait.
+         */
         function handleRefresh() {
             const lastRefresh = getStoredRefresh();
             const now = Date.now();
@@ -760,7 +771,9 @@ function outputHTML($data, $cacheAge) {
             window.location.href = '?league=<?php echo $leagueId; ?>&refresh=1';
         }
         
-        // Check cooldown on page load and update button state
+        /**
+         * Disable the refresh button until any stored cooldown has expired.
+         */
         function checkCooldown() {
             const lastRefresh = getStoredRefresh();
             const now = Date.now();
@@ -798,7 +811,9 @@ function outputHTML($data, $cacheAge) {
 }
 
 /**
- * Display homepage with instructions
+ * Render the league lookup homepage and end the request.
+ *
+ * When supplied, the error message is displayed above the form.
  */
 function displayHomepage($error = null) {
     $pageTitle = 'FPL Points Calculator | Live Fantasy Premier League Leaderboard';
