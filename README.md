@@ -19,6 +19,8 @@ A PHP-based web application that displays live Fantasy Premier League (FPL) leag
 - **Gameweek Tracking** - Shows current gameweek and individual GW points
 - **Overall Ranks** - Displays each team's global FPL ranking
 - **One-Click Refresh** - Fixed refresh button for instant updates
+- **Squad Viewer** - View the players selected by each league manager
+- **Transfer Ideas** - Compare affordable players using FPL projected points and copy an optional prompt to an AI assistant
 - **User-Friendly Homepage** - Easy league ID input with helpful instructions
 
 ## 🚀 Quick Start
@@ -86,8 +88,12 @@ Displays a beautiful, responsive leaderboard with:
 - Live indicator with pulse animation
 - Sortable standings with ranks
 - Total points, gameweek points, and overall ranks
+- A squad viewer for each league entry, including starters, bench, and captain picks
+- Advisory projected-point transfer ideas and an optional copyable AI prompt
 - Last updated timestamp
 - One-click refresh button
+
+Select **View squad** beside a manager to see their current picks. Transfer ideas compare FPL projected points with each player's selling price. They are advisory rather than AI-generated; **Copy AI prompt** lets you share the squad and ideas with an AI service of your choice. No AI account or API key is needed by this application.
 
 #### 2. JSON API Response
 ```

@@ -164,7 +164,7 @@ function saveToCache($leagueId, $data) {
  * Fetch current gameweek from bootstrap-static API
  */
 function getCurrentGameweek() {
-    $data = fetchData(FPL_API_BASE . '/bootstrap-static/');
+    $data = getBootstrapData();
     
     foreach ($data['events'] as $event) {
         if ($event['is_current']) {
@@ -180,6 +180,110 @@ function getCurrentGameweek() {
     }
     
     return 1;
+}
+
+/**
+ * Get bootstrap data from the short-lived cache.
+ */
+function getBootstrapData() {
+    ensureCacheDirectory();
+    $cacheFile = CACHE_DIR . '/fpl_bootstrap_static.json';
+
+    if (file_exists($cacheFile) && time() - filemtime($cacheFile) < CACHE_DURATION) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        if (isset($cached['elements'], $cached['teams'])) {
+            return $cached;
+        }
+    }
+
+    $data = fetchData(FPL_API_BASE . '/bootstrap-static/');
+    if (!isset($data['elements'], $data['teams'])) {
+        throw new Exception('Invalid player data received');
+    }
+    file_put_contents($cacheFile, json_encode($data));
+    return $data;
+}
+
+/**
+ * Fetch a manager's current squad and identify affordable projected-point upgrades.
+ */
+function fetchManagerTeamData($entryId, $gameweek) {
+    $picksData = fetchData(FPL_API_BASE . "/entry/$entryId/event/$gameweek/picks/");
+    if (!isset($picksData['picks']) || !is_array($picksData['picks'])) {
+        throw new Exception('Invalid team data received');
+    }
+
+    $bootstrap = getBootstrapData();
+    $players = [];
+    foreach ($bootstrap['elements'] as $player) {
+        $players[$player['id']] = $player;
+    }
+    $teams = [];
+    foreach ($bootstrap['teams'] as $team) {
+        $teams[$team['id']] = $team['short_name'];
+    }
+
+    $squad = [];
+    $ownedIds = [];
+    foreach ($picksData['picks'] as $pick) {
+        $player = $players[$pick['element']] ?? null;
+        if (!$player) {
+            continue;
+        }
+        $ownedIds[] = (int)$pick['element'];
+        $squad[] = [
+            'id' => (int)$player['id'],
+            'name' => $player['web_name'],
+            'position' => (int)$player['element_type'],
+            'position_in_squad' => (int)$pick['position'],
+            'team' => $teams[$player['team']] ?? '',
+            'projected_points' => (float)($player['ep_next'] ?? 0),
+            'selling_price' => (int)($pick['selling_price'] ?? $player['now_cost']),
+            'is_captain' => !empty($pick['is_captain']),
+            'is_vice_captain' => !empty($pick['is_vice_captain'])
+        ];
+    }
+
+    $positionNames = [1 => 'Goalkeeper', 2 => 'Defender', 3 => 'Midfielder', 4 => 'Forward'];
+    $recommendations = [];
+    foreach ($squad as $currentPlayer) {
+        if ($currentPlayer['position_in_squad'] > 11) {
+            continue;
+        }
+        foreach ($bootstrap['elements'] as $candidate) {
+            if ((int)$candidate['element_type'] !== $currentPlayer['position']
+                || in_array((int)$candidate['id'], $ownedIds, true)
+                || ($candidate['status'] ?? '') !== 'a'
+                || (int)$candidate['now_cost'] > $currentPlayer['selling_price']) {
+                continue;
+            }
+
+            $candidatePoints = (float)($candidate['ep_next'] ?? 0);
+            $pointsGain = round($candidatePoints - $currentPlayer['projected_points'], 1);
+            if ($pointsGain <= 0) {
+                continue;
+            }
+            $recommendations[] = [
+                'out' => $currentPlayer['name'],
+                'in' => $candidate['web_name'],
+                'position' => $positionNames[$currentPlayer['position']] ?? '',
+                'team' => $teams[$candidate['team']] ?? '',
+                'projected_points' => $candidatePoints,
+                'points_gain' => $pointsGain,
+                'price' => (int)$candidate['now_cost']
+            ];
+        }
+    }
+    usort($recommendations, function($a, $b) {
+        return $b['points_gain'] <=> $a['points_gain'];
+    });
+
+    return [
+        'entry_id' => (int)$entryId,
+        'gameweek' => (int)$gameweek,
+        'squad' => $squad,
+        'recommendations' => array_slice($recommendations, 0, 3)
+    ];
 }
 
 /**
@@ -519,6 +623,71 @@ function outputHTML($data, $cacheAge) {
             color: #999;
             font-size: 0.9em;
         }
+
+        .view-team-button {
+            margin-top: 6px;
+            padding: 5px 10px;
+            border: 1px solid #37003c;
+            border-radius: 16px;
+            background: white;
+            color: #37003c;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .view-team-button:hover {
+            background: #37003c;
+            color: white;
+        }
+
+        .team-panel {
+            margin-top: 20px;
+            padding: 24px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .team-panel h2 {
+            color: #37003c;
+            margin-bottom: 12px;
+        }
+
+        .team-panel h3 {
+            color: #37003c;
+            margin: 20px 0 10px;
+        }
+
+        .team-panel ul {
+            padding-left: 22px;
+            line-height: 1.8;
+        }
+
+        .team-panel .panel-close {
+            float: right;
+            padding: 6px 12px;
+            border: 0;
+            border-radius: 16px;
+            background: #eee;
+            cursor: pointer;
+        }
+
+        .ai-prompt {
+            width: 100%;
+            min-height: 100px;
+            margin-top: 10px;
+            padding: 10px;
+        }
+
+        .ai-prompt-button {
+            margin-top: 10px;
+            padding: 9px 14px;
+            border: 0;
+            border-radius: 20px;
+            background: #37003c;
+            color: white;
+            cursor: pointer;
+        }
         
         .total-points {
             font-weight: bold;
@@ -705,6 +874,9 @@ function outputHTML($data, $cacheAge) {
                             <div class="team-info">
                                 <div class="team-name"><?php echo htmlspecialchars($standing['entry_name']); ?></div>
                                 <div class="manager-name"><?php echo htmlspecialchars($standing['player_name']); ?></div>
+                                <button class="view-team-button" type="button" data-entry-id="<?php echo (int)$standing['entry_id']; ?>" data-entry-name="<?php echo escapeAttr($standing['entry_name']); ?>">
+                                    View squad
+                                </button>
                             </div>
                         </td>
                         <td class="center total-points"><?php echo number_format($standing['total_points']); ?></td>
@@ -715,6 +887,12 @@ function outputHTML($data, $cacheAge) {
                 </tbody>
             </table>
         </div>
+
+        <section class="team-panel" id="teamPanel" hidden aria-live="polite">
+            <button type="button" class="panel-close" id="teamPanelClose">Close</button>
+            <h2 id="teamPanelTitle">Manager squad</h2>
+            <div id="teamPanelContent">Loading squad…</div>
+        </section>
         
         <button class="refresh-button" id="refreshBtn" onclick="handleRefresh()">
             ↻ Refresh
@@ -790,6 +968,96 @@ function outputHTML($data, $cacheAge) {
         }
         
         checkCooldown();
+
+        const teamPanel = document.getElementById('teamPanel');
+        const teamPanelContent = document.getElementById('teamPanelContent');
+        const positionNames = {1: 'Goalkeeper', 2: 'Defender', 3: 'Midfielder', 4: 'Forward'};
+        document.querySelectorAll('.view-team-button').forEach(button => {
+            button.addEventListener('click', async () => {
+                teamPanel.hidden = false;
+                document.getElementById('teamPanelTitle').textContent = button.dataset.entryName + ' squad';
+                teamPanelContent.textContent = 'Loading squad…';
+                teamPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
+                try {
+                    const params = new URLSearchParams({
+                        league: '<?php echo escapeAttr((string)$leagueId); ?>',
+                        team: button.dataset.entryId
+                    });
+                    const response = await fetch('?' + params.toString());
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Unable to load this squad.');
+                    }
+                    renderTeam(data, button.dataset.entryName);
+                } catch (error) {
+                    teamPanelContent.textContent = error.message;
+                }
+            });
+        });
+
+        document.getElementById('teamPanelClose').addEventListener('click', () => {
+            teamPanel.hidden = true;
+        });
+
+        function renderTeam(data, managerName) {
+            teamPanelContent.replaceChildren();
+            const squadList = document.createElement('ul');
+            data.squad.forEach(player => {
+                const item = document.createElement('li');
+                const role = player.position_in_squad <= 11 ? 'Starter' : 'Bench';
+                const captain = player.is_captain ? ' · Captain' : (player.is_vice_captain ? ' · Vice-captain' : '');
+                item.textContent = `${role}: ${player.name} (${positionNames[player.position] || 'Player'}, ${player.team}) · ${player.projected_points} projected points${captain}`;
+                squadList.appendChild(item);
+            });
+            teamPanelContent.appendChild(squadList);
+
+            const recommendationsTitle = document.createElement('h3');
+            recommendationsTitle.textContent = 'Projected-point transfer ideas';
+            teamPanelContent.appendChild(recommendationsTitle);
+            const note = document.createElement('p');
+            note.textContent = 'Advisory suggestions use FPL projected points and current selling prices; they are not generated by an AI model.';
+            teamPanelContent.appendChild(note);
+            const recommendations = document.createElement('ul');
+            if (data.recommendations.length) {
+                data.recommendations.forEach(suggestion => {
+                    const item = document.createElement('li');
+                    item.textContent = `${suggestion.out} → ${suggestion.in} (${suggestion.team}, ${suggestion.position}): +${suggestion.points_gain} projected points`;
+                    recommendations.appendChild(item);
+                });
+            } else {
+                const item = document.createElement('li');
+                item.textContent = 'No affordable projected-point upgrades found.';
+                recommendations.appendChild(item);
+            }
+            teamPanelContent.appendChild(recommendations);
+
+            const promptTitle = document.createElement('h3');
+            promptTitle.textContent = 'Ask your AI assistant';
+            teamPanelContent.appendChild(promptTitle);
+            const promptHelp = document.createElement('p');
+            promptHelp.textContent = 'Copy this prompt and paste it into your preferred AI service for additional transfer advice.';
+            teamPanelContent.appendChild(promptHelp);
+            const prompt = document.createElement('textarea');
+            prompt.className = 'ai-prompt';
+            prompt.readOnly = true;
+            prompt.value = `Review this FPL squad and suggest improvements for gameweek ${data.gameweek}. Consider the listed projected-point ideas, budget constraints, fixtures and transfer costs. Explain uncertainty and do not assume unavailable player data.\nManager: ${managerName}\nSquad: ${data.squad.map(player => `${player.name} (${positionNames[player.position]}, ${player.team}, ${player.projected_points} projected points)`).join('; ')}\nSuggestions: ${data.recommendations.map(item => `${item.out} for ${item.in} (+${item.points_gain} projected points)`).join('; ') || 'None found'}`;
+            teamPanelContent.appendChild(prompt);
+            const copyButton = document.createElement('button');
+            copyButton.type = 'button';
+            copyButton.className = 'ai-prompt-button';
+            copyButton.textContent = 'Copy AI prompt';
+            copyButton.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(prompt.value);
+                    copyButton.textContent = 'Prompt copied';
+                } catch (error) {
+                    prompt.focus();
+                    prompt.select();
+                    copyButton.textContent = 'Select and copy prompt';
+                }
+            });
+            teamPanelContent.appendChild(copyButton);
+        }
     </script>
 </body>
 </html>
@@ -1158,6 +1426,7 @@ function displayHomepage($error = null) {
 $leagueId = isset($_GET['league']) ? trim($_GET['league']) : null;
 $format = isset($_GET['format']) ? strtolower(trim($_GET['format'])) : 'html';
 $forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] == '1';
+$teamId = isset($_GET['team']) ? trim($_GET['team']) : null;
 
 // Validate format
 if (!in_array($format, ['html', 'json', 'csv'])) {
@@ -1172,6 +1441,35 @@ if (!$leagueId) {
 // Validate league ID is numeric
 if (!is_numeric($leagueId)) {
     displayHomepage('Invalid league ID. Please enter a numeric league ID.');
+}
+
+if ($teamId !== null) {
+    header('Content-Type: application/json');
+    if (!ctype_digit($teamId)) {
+        http_response_code(400);
+        echo json_encode(['message' => 'Invalid team ID.']);
+        exit;
+    }
+    try {
+        $leagueData = fetchLeagueData($leagueId);
+        $isLeagueMember = false;
+        foreach ($leagueData['standings'] as $standing) {
+            if ((int)$standing['entry_id'] === (int)$teamId) {
+                $isLeagueMember = true;
+                break;
+            }
+        }
+        if (!$isLeagueMember) {
+            http_response_code(404);
+            echo json_encode(['message' => 'Team not found in this league.']);
+            exit;
+        }
+        echo json_encode(fetchManagerTeamData($teamId, $leagueData['league']['current_gameweek']));
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['message' => $e->getMessage()]);
+    }
+    exit;
 }
 
 // Server-side rate limiting for forced refresh
